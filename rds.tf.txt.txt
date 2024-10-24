@@ -1,0 +1,71 @@
+provider "aws" {
+  region = "us-west-2"  # Change to your preferred region
+}
+
+# Create a VPC
+resource "aws_vpc" "example" {
+  cidr_block = "10.0.0.0/16"  # CIDR block for the VPC
+}
+
+# Create a Subnet
+resource "aws_subnet" "example" {
+  vpc_id            = aws_vpc.example.id
+  cidr_block        = "10.0.1.0/24"  # CIDR block for the subnet
+  availability_zone = "us-west-2a"   # Specify the AZ
+}
+
+# Create a Security Group
+resource "aws_security_group" "rds_sg" {
+  vpc_id = aws_vpc.example.id
+
+  ingress {
+    from_port   = 3306  # MySQL default port; change for other DB types
+    to_port     = 3306
+    protocol    = "tcp"
+    cidr_blocks  = ["0.0.0.0/0"]  # Change for more restrictive access
+  }
+
+  egress {
+    from_port   = 0
+    to_port     = 0
+    protocol    = "-1"
+    cidr_blocks  = ["0.0.0.0/0"]
+  }
+
+  tags = {
+    Name = "rds-security-group"
+  }
+}
+
+# Create a DB Subnet Group
+resource "aws_db_subnet_group" "example" {
+  name       = "example-db-subnet-group"
+  subnet_ids = [aws_subnet.example.id]
+
+  tags = {
+    Name = "example-db-subnet-group"
+  }
+}
+
+# Create an RDS Instance
+resource "aws_db_instance" "example" {
+  identifier         = "example-db-instance"
+  engine             = "mysql"  # Change to your preferred engine (e.g., postgres, sqlserver)
+  instance_class     = "db.t2.micro"
+  allocated_storage   = 20  # Storage in GiB
+  storage_type       = "gp2"  # General Purpose SSD
+  username           = "admin"  # Master username
+  password           = "your_password"  # Change to a secure password
+  db_subnet_group_name = aws_db_subnet_group.example.name
+  vpc_security_group_ids = [aws_security_group.rds_sg.id]
+  skip_final_snapshot = true  # Set to false in production for data safety
+
+  tags = {
+    Name = "example-rds-instance"
+  }
+}
+
+# Output the RDS endpoint
+output "db_instance_endpoint" {
+  value = aws_db_instance.example.endpoint
+}
